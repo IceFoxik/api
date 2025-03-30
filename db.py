@@ -2,7 +2,7 @@ import psycopg2
 from contextlib import closing
 
 # Настройка подключения к PostgreSQL
-DATABASE_URL = "dbname=postgres user=postgres password=adsl311812 host=localhost port=5432"
+DATABASE_URL = "dbname=postgres user=postgres password=password host=localhost port=5432"
 
 def get_db_connection():
     try:
