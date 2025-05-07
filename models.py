@@ -7,7 +7,7 @@ class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     telegram_id = Column(String, unique=True, nullable=False)
-    user_type = Column(String, nullable=False)  # 'teacher' или 'student'
+    user_type = Column(String, nullable=False)  
 
     teacher_id = Column(Integer, ForeignKey('teachers.id'), nullable=True)
     group_id = Column(Integer, ForeignKey('groups.id'), nullable=True)

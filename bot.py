@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -8,7 +10,11 @@ from database import async_session
 from models import Base, User, Group, Teacher, Audience, Discipline, DayOfWeek, Couple, Schedule
 from sqlalchemy import select
 
-API_TOKEN = "8040196337:AAHM-ekXN0XOzj9TGTfPBe_pMWKnUMNiiMI"
+
+load_dotenv()
+
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TEACHER_PASSWORD = os.getenv("TEACHER_PASSWORD")
 
 # Инициализация бота
 bot = Bot(token=API_TOKEN)
@@ -28,6 +34,9 @@ class AddScheduleState(StatesGroup):
 class GetScheduleState(StatesGroup):
     group_name = State()
 
+class RegisterTeacher(StatesGroup):
+    waiting_for_password = State()
+
 # === Команда /start ===
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -40,9 +49,9 @@ async def cmd_start(message: types.Message):
         "/get_schedule — Получить расписание"
     )
 
-# === Регистрация учителя ===
+# Команда для регистрации учителя
 @dp.message(Command("register_teacher"))
-async def register_teacher(message: types.Message):
+async def register_teacher(message: types.Message, state: FSMContext):
     telegram_id = str(message.from_user.id)
 
     async with async_session() as session:
@@ -54,12 +63,31 @@ async def register_teacher(message: types.Message):
             await message.reply("Вы уже зарегистрированы как учитель.")
             return
 
-        # Если нет — создаём нового пользователя
+    # Переходим в состояние ожидания пароля
+    await message.reply("Введите пароль для регистрации:")
+    await state.set_state(RegisterTeacher.waiting_for_password)  # Устанавливаем состояние
+
+# Обработчик ввода пароля
+@dp.message(RegisterTeacher.waiting_for_password)
+async def process_password(message: types.Message, state: FSMContext):
+    # Заранее установленный пароль (можно хранить в переменной окружения)
+    correct_password = TEACHER_PASSWORD # Замените на реальный пароль
+
+    if message.text != correct_password:
+        await message.reply("Неверный пароль. Регистрация отменена.")
+        await state.clear()  # Сбрасываем состояние
+        return
+
+    telegram_id = str(message.from_user.id)
+
+    async with async_session() as session:
+        # Создаём нового пользователя
         new_user = User(telegram_id=telegram_id, user_type='teacher')
         session.add(new_user)
         await session.commit()
 
-    await message.reply("Вы зарегистрированы как преподаватель.")
+    await message.reply("Вы успешно зарегистрированы как преподаватель.")
+    await state.clear()  # Сбрасываем состояние
 
 # === Регистрация студента ===
 @dp.message(Command("register_student"))
@@ -80,7 +108,7 @@ async def process_register_student(message: types.Message, state: FSMContext):
         result = await session.execute(select(Group).where(Group.name == group_name))
         group = result.scalars().first()
         if not group:
-            await message.reply("Группа не найдена. Вы можете создать её, если хотите?")
+            await message.reply("Группа не найдена.")
             return
 
         # Проверяем, не зарегистрирован ли уже пользователь
